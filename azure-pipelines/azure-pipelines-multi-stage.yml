@@ -1,7 +1,8 @@
 trigger:
+  batch: true
   branches:
     include:
-      - "*"
+      - none # TODO change this to '*'
 
 pr:
   branches:
@@ -12,59 +13,51 @@ pool:
   vmImage: 'ubuntu-latest'
 
 variables:
-  - name: APP_NAME
-    value: 'playground-angular'
-  #   defined in the Pipeline Library variable group
-  #   see: https://learn.microsoft.com/en-us/azure/devops/pipelines/library/variable-groups?view=azure-devops&tabs=yaml
-  - group: DEPLOYMENT_TOKENS
+  - template: _variables.yml
 
 stages:
-  - stage: Build_and_Test
-    displayName: 'Build and Test'
+  - stage: StageJobInstallLintBuildTest
+    displayName: 'Install, Lint, Build and Test'
     jobs:
-      - job: Build
+      - job: JobInstallLintBuildTest
         displayName: 'Build'
         steps:
-          - task: NodeTool@0
-            inputs:
-              versionSpec: '14.21.3'
-            displayName: 'Install Node.js'
-          - script: |
-              npm ci
-              npm run build
-              npm run test:ci
-            displayName: 'Build and Test'
+          - template: _install-lint-build.yml
+            parameters:
+              isProd: ${{ variables.isProd }}
+          # https://learn.microsoft.com/en-us/azure/devops/pipelines/tasks/reference/copy-files-v2?view=azure-pipelines&tabs=yaml
           - task: CopyFiles@2
-            displayName: 'Copying files from dist folder'
+            displayName: 'Copying files from $(BUILD_OUTPUT_FOLDER) folder'
             inputs:
-              Contents: azure-pipelines/*
-              TargetFolder: dist/
+              contents: |
+                azure-pipelines/staticwebapp.config.json
+              targetFolder: '$(BUILD_OUTPUT_FOLDER)/$(APP_NAME)'
+              flattenFolders: true
           - task: PublishBuildArtifacts@1
             displayName: 'Publish Artifact'
             inputs:
-              pathToPublish: dist
-              artifactName: drop
-          - script: npm run lint
-            displayName: 'Lint'
+              pathToPublish: '$(BUILD_OUTPUT_FOLDER)/$(APP_NAME)'
+              artifactName: '$(ARTIFACT_NAME)'
 
-  - stage: ManualProdDeploy
-    displayName: "PROD Deploy Approval: Playground Angular"
-    dependsOn: Build_and_Test
+  - stage: StageManualProdDeploy
+    displayName: 'PROD Deploy Approval: Playground Angular'
+    dependsOn: StageJobInstallLintBuildTest
     jobs:
-      - job: ApprovalJob
+      - job: JobApproval
         displayName: 'Approval for Prod Deploy'
         pool: server
         steps:
+          # https://learn.microsoft.com/en-us/azure/devops/pipelines/tasks/reference/manual-validation-v0?view=azure-pipelines
           - task: ManualValidation@0
             inputs:
-              notifyUsers: |
-                craigwg@microgaming.co.uk
+#              notifyUsers: |
+#                user@example.com
               instructions: 'On Approval, performs a PROD Deploy'
               onTimeout: 'resume'
 
   - stage: DeployPROD
     displayName: 'Deploy: PROD'
-    dependsOn: ManualProdDeploy
+    dependsOn: StageManualProdDeploy
     jobs:
       - deployment: Deploy
         displayName: 'Deploy'
@@ -75,22 +68,8 @@ stages:
               steps:
                 - download: none
                 - checkout: none
-                - task: DownloadBuildArtifacts@1
-                  displayName: Download artifacts
-                  inputs:
-                    buildType: current
-                    downloadType: single
-                    artifactName: drop
-                    downloadPath: $(System.ArtifactsDirectory)
-                - script: ls -laGh $(System.ArtifactsDirectory)
-                - task: AzureStaticWebApp@0
-                  displayName: Deploy to Production environment
-                  inputs:
-                    app_location: playground-angular
-                    skip_app_build: true
-                    skip_api_build: true
-                    is_static_export: true
-                    verbose: true
-                    azure_static_web_apps_api_token: $(PLAYGROUND_ANGULAR_DEPLOYMENT_TOKEN)
-                    workingDirectory: $(System.ArtifactsDirectory)/drop
-                    config_file_location: '/azure-pipelines/'
+                - template: _deploy.yml
+                  parameters:
+                    isProd: ${{ variables.isProd }}
+                    APP_NAME: ${{ variables.APP_NAME }}
+                    BUILD_OUTPUT_FOLDER: ${{ variables.BUILD_OUTPUT_FOLDER }}

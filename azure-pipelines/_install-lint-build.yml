@@ -1,0 +1,37 @@
+parameters:
+  - name: isProd
+    type: boolean
+    default: false
+
+steps:
+  - task: NodeTool@0
+    displayName: 'Install Node.js'
+    inputs:
+      versionSpec: '14.21.3'
+
+  # https://learn.microsoft.com/en-us/azure/devops/pipelines/release/caching?view=azure-devops
+  # https://josh-ops.com/posts/azdo-angular-pipeline-caching/
+  - task: Cache@2
+    displayName: load npm cache
+    inputs:
+      key: npm | $(Agent.OS) | $(Build.SourcesDirectory)/package-lock.json
+      restoreKeys: |
+        npm | "$(Agent.OS)"
+      path: $(Build.SourcesDirectory)/node_modules
+      cacheHitVar: CACHE_HIT
+
+  - task: Npm@1
+    displayName: 'Install Node Packages'
+    inputs:
+      command: 'ci'
+
+  - script: npm run lint
+    displayName: 'Lint: Typescript'
+
+  - script: npm run build
+    condition: ${{ and(succeeded(), eq(parameters.isProd, false)) }}
+    displayName: 'Angular Build: UAT'
+
+  - script: npm run build -- -c production
+    condition: ${{ and(succeeded(), eq(parameters.isProd, true)) }}
+    displayName: 'Angular Build: PROD'
