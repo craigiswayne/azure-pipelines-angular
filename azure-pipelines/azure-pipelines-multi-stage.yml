@@ -2,7 +2,7 @@ trigger:
   batch: true
   branches:
     include:
-      - none # TODO change this to '*'
+      - '*'
 
 pr:
   branches:
