@@ -1,0 +1,75 @@
+trigger:
+  batch: true
+  branches:
+    include:
+      - none # TODO change this to '*'
+
+pr:
+  branches:
+    include:
+      - '*'
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+  - template: _variables.yml
+
+stages:
+  - stage: StageJobInstallLintBuildTest
+    displayName: 'Install, Lint, Build and Test'
+    jobs:
+      - job: JobInstallLintBuildTest
+        displayName: 'Build'
+        steps:
+          - template: _install-lint-build.yml
+            parameters:
+              isProd: ${{ variables.isProd }}
+          # https://learn.microsoft.com/en-us/azure/devops/pipelines/tasks/reference/copy-files-v2?view=azure-pipelines&tabs=yaml
+          - task: CopyFiles@2
+            displayName: 'Copying files from $(BUILD_OUTPUT_FOLDER) folder'
+            inputs:
+              contents: |
+                azure-pipelines/staticwebapp.config.json
+              targetFolder: '$(BUILD_OUTPUT_FOLDER)/$(APP_NAME)'
+              flattenFolders: true
+          - task: PublishBuildArtifacts@1
+            displayName: 'Publish Artifact'
+            inputs:
+              pathToPublish: '$(BUILD_OUTPUT_FOLDER)/$(APP_NAME)'
+              artifactName: '$(ARTIFACT_NAME)'
+
+  - stage: StageManualProdDeploy
+    displayName: 'PROD Deploy Approval: Playground Angular'
+    dependsOn: StageJobInstallLintBuildTest
+    jobs:
+      - job: JobApproval
+        displayName: 'Approval for Prod Deploy'
+        pool: server
+        steps:
+          # https://learn.microsoft.com/en-us/azure/devops/pipelines/tasks/reference/manual-validation-v0?view=azure-pipelines
+          - task: ManualValidation@0
+            inputs:
+#              notifyUsers: |
+#                user@example.com
+              instructions: 'On Approval, performs a PROD Deploy'
+              onTimeout: 'resume'
+
+  - stage: DeployPROD
+    displayName: 'Deploy: PROD'
+    dependsOn: StageManualProdDeploy
+    jobs:
+      - deployment: Deploy
+        displayName: 'Deploy'
+        environment: 'production'
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - download: none
+                - checkout: none
+                - template: _deploy.yml
+                  parameters:
+                    isProd: ${{ variables.isProd }}
+                    APP_NAME: ${{ variables.APP_NAME }}
+                    BUILD_OUTPUT_FOLDER: ${{ variables.BUILD_OUTPUT_FOLDER }}

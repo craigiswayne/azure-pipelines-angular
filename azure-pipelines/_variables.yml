@@ -1,0 +1,15 @@
+variables:
+  - name: APP_NAME
+    value: 'playground-angular'
+  - name: BUILD_OUTPUT_FOLDER
+    value: 'dist'
+  # Initiate Prod Deploys when the branch name starts with 'release/'
+  # e.g. 'release/my-first-deploy'
+  - name: isProd
+    # https://learn.microsoft.com/en-us/azure/devops/pipelines/process/expressions?view=azure-devops
+    value: ${{ startsWith(variables['Build.SourceBranch'], 'refs/heads/release/') }}
+  - name: ARTIFACT_NAME
+    value: '$(Build.Repository.Name).$(Build.BuildNumber)'
+  # defined in the Pipeline Library variable group
+  # see: https://learn.microsoft.com/en-us/azure/devops/pipelines/library/variable-groups?view=azure-devops&tabs=yaml
+  - group: DEFAULT_VARIABLE_GROUP
