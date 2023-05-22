@@ -29,9 +29,9 @@ steps:
     displayName: 'Lint: Typescript'
 
   - script: npm run build
-    condition: ${{ and(succeeded(), eq(parameters.isProd, false)) }}
+    condition: ${{ eq(parameters.isProd, false) }}
     displayName: 'Angular Build: UAT'
 
   - script: npm run build -- -c production
-    condition: ${{ and(succeeded(), eq(parameters.isProd, true)) }}
+    condition: ${{ eq(parameters.isProd, true) }}
     displayName: 'Angular Build: PROD'
