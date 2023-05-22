@@ -1,0 +1,96 @@
+trigger:
+  branches:
+    include:
+      - "*"
+
+pr:
+  branches:
+    include:
+      - '*'
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+  - name: APP_NAME
+    value: 'playground-angular'
+  #   defined in the Pipeline Library variable group
+  #   see: https://learn.microsoft.com/en-us/azure/devops/pipelines/library/variable-groups?view=azure-devops&tabs=yaml
+  - group: DEPLOYMENT_TOKENS
+
+stages:
+  - stage: Build_and_Test
+    displayName: 'Build and Test'
+    jobs:
+      - job: Build
+        displayName: 'Build'
+        steps:
+          - task: NodeTool@0
+            inputs:
+              versionSpec: '14.21.3'
+            displayName: 'Install Node.js'
+          - script: |
+              npm ci
+              npm run build
+              npm run test:ci
+            displayName: 'Build and Test'
+          - task: CopyFiles@2
+            displayName: 'Copying files from dist folder'
+            inputs:
+              Contents: azure-pipelines/*
+              TargetFolder: dist/
+          - task: PublishBuildArtifacts@1
+            displayName: 'Publish Artifact'
+            inputs:
+              pathToPublish: dist
+              artifactName: drop
+          - script: npm run lint
+            displayName: 'Lint'
+
+  - stage: ManualProdDeploy
+    displayName: "PROD Deploy Approval: Playground Angular"
+    dependsOn: Build_and_Test
+    jobs:
+      - job: ApprovalJob
+        displayName: 'Approval for Prod Deploy'
+        pool: server
+        steps:
+          - task: ManualValidation@0
+            inputs:
+              notifyUsers: |
+                craigwg@microgaming.co.uk
+              instructions: 'On Approval, performs a PROD Deploy'
+              onTimeout: 'resume'
+
+  - stage: DeployPROD
+    displayName: 'Deploy: PROD'
+    dependsOn: ManualProdDeploy
+    jobs:
+      - deployment: Deploy
+        displayName: 'Deploy'
+        environment: 'production'
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - download: none
+                - checkout: none
+                - task: DownloadBuildArtifacts@1
+                  displayName: Download artifacts
+                  inputs:
+                    buildType: current
+                    downloadType: single
+                    artifactName: drop
+                    downloadPath: $(System.ArtifactsDirectory)
+                - script: ls -laGh $(System.ArtifactsDirectory)
+                - task: AzureStaticWebApp@0
+                  displayName: Deploy to Production environment
+                  inputs:
+                    app_location: playground-angular
+                    skip_app_build: true
+                    skip_api_build: true
+                    is_static_export: true
+                    verbose: true
+                    azure_static_web_apps_api_token: $(PLAYGROUND_ANGULAR_DEPLOYMENT_TOKEN)
+                    workingDirectory: $(System.ArtifactsDirectory)/drop
+                    config_file_location: '/azure-pipelines/'
