@@ -1,0 +1,59 @@
+parameters:
+  - name: env
+    type: string
+    values:
+      - 'uat'
+      - 'prod'
+  - name: ARTIFACT_NAME
+    type: string
+  - name: dependsOn
+    type: string
+
+stages:
+  - stage: 'Deploy${{parameters.env}}'
+    displayName: 'Deploy: ${{upper(parameters.env)}}'
+    dependsOn: ${{parameters.dependsOn}}
+    jobs:
+      - deployment: Deploy
+        displayName: 'Deploy: ${{upper(parameters.env)}}'
+        ${{ if eq(parameters.env, 'prod') }}:
+          environment: 'production'
+        ${{ else }}:
+          environment: ${{parameters.env}}
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - download: none
+                - checkout: none
+
+                - task: DownloadBuildArtifacts@1
+                  displayName: Download artifacts
+                  inputs:
+                    buildType: current
+                    downloadType: single
+                    artifactName: '${{parameters.ARTIFACT_NAME}}'
+                    downloadPath: $(System.ArtifactsDirectory)
+
+                # see: https://learn.microsoft.com/en-us/azure/devops/pipelines/tasks/reference/azure-static-web-app-v0?view=azure-pipelines
+                - task: AzureStaticWebApp@0
+                  displayName: 'Deploy: ${{upper(parameters.env)}}'
+                  inputs:
+                    build_timeout_in_minutes: 5
+                    workingDirectory: '$(System.ArtifactsDirectory)/${{parameters.ARTIFACT_NAME}}'
+                    ${{ if ne(parameters.env, 'prod') }}:
+                      deployment_environment: '${{parameters.env}}'
+                    app_location: '/'
+                    # Look inside this directory for the staticwebapp.config.json file
+                    # This file allows you to further configure your static web app
+                    # https://learn.microsoft.com/en-us/azure/static-web-apps/configuration
+                    config_file_location: '/'
+                    # We do not need to build our app since it is already done in previous steps
+                    # https://github.com/microsoft/Oryx/blob/main/doc/configuration.md
+                    skip_app_build: true
+                    skip_api_build: true
+                    is_static_export: true
+                    verbose: true
+                    # defined in the pipeline library variable group
+                    # see the variables properties above
+                    azure_static_web_apps_api_token: '$(AZURE_STATIC_WEB_APPS_API_TOKEN)'
