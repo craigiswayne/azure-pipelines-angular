@@ -2,7 +2,7 @@ trigger:
   batch: true
   branches:
     include:
-      - none # TODO change this to '*'
+      - '*'
 
 pr:
   branches:
@@ -25,19 +25,6 @@ stages:
           - template: _install-lint-build.yml
             parameters:
               isProd: ${{ variables.isProd }}
-          # https://learn.microsoft.com/en-us/azure/devops/pipelines/tasks/reference/copy-files-v2?view=azure-pipelines&tabs=yaml
-          - task: CopyFiles@2
-            displayName: 'Copying files from $(BUILD_OUTPUT_FOLDER) folder'
-            inputs:
-              contents: |
-                azure-pipelines/staticwebapp.config.json
-              targetFolder: '$(BUILD_OUTPUT_FOLDER)/$(APP_NAME)'
-              flattenFolders: true
-          - task: PublishBuildArtifacts@1
-            displayName: 'Publish Artifact'
-            inputs:
-              pathToPublish: '$(BUILD_OUTPUT_FOLDER)/$(APP_NAME)'
-              artifactName: '$(ARTIFACT_NAME)'
 
   - stage: StageManualProdDeploy
     displayName: 'PROD Deploy Approval: Playground Angular'
@@ -53,14 +40,14 @@ stages:
 #              notifyUsers: |
 #                user@example.com
               instructions: 'On Approval, performs a PROD Deploy'
-              onTimeout: 'resume'
+#              onTimeout: 'resume'
 
   - stage: DeployPROD
     displayName: 'Deploy: PROD'
     dependsOn: StageManualProdDeploy
     jobs:
       - deployment: Deploy
-        displayName: 'Deploy'
+        displayName: 'Deploy: PROD'
         environment: 'production'
         strategy:
           runOnce:
@@ -68,8 +55,39 @@ stages:
               steps:
                 - download: none
                 - checkout: none
-                - template: _deploy.yml
-                  parameters:
-                    isProd: ${{ variables.isProd }}
-                    APP_NAME: ${{ variables.APP_NAME }}
-                    BUILD_OUTPUT_FOLDER: ${{ variables.BUILD_OUTPUT_FOLDER }}
+                - task: DownloadBuildArtifacts@1
+                  displayName: Download artifacts
+                  inputs:
+                    buildType: current
+                    downloadType: single
+                    artifactName: '$(ARTIFACT_NAME_PROD)'
+                    downloadPath: $(System.ArtifactsDirectory)
+                - task: AzureStaticWebApp@0
+                  displayName: 'Deploy: PROD'
+                  inputs:
+                    build_timeout_in_minutes: 5
+                    workingDirectory: '$(System.ArtifactsDirectory)/$(ARTIFACT_NAME_PROD)'
+                    deployment_environment: ''
+                    app_location: '/'
+                    # Look inside this directory for the staticwebapp.config.json file
+                    # This file allows you to further configure your static web app
+                    # https://learn.microsoft.com/en-us/azure/static-web-apps/configuration
+                    config_file_location: '/'
+                    # We do not need to build our app since it is already done in previous steps
+                    # https://github.com/microsoft/Oryx/blob/main/doc/configuration.md
+                    skip_app_build: true
+                    skip_api_build: true
+                    is_static_export: true
+                    verbose: true
+                    # defined in the pipeline library variable group
+                    # see the variables properties above
+                    azure_static_web_apps_api_token: '$(AZURE_STATIC_WEB_APPS_API_TOKEN)'
+
+  - stage: DeployUAT
+    displayName: 'Deploy: UAT'
+    dependsOn: StageJobInstallLintBuildTest
+    jobs:
+      - template: '_job_deploy.yml'
+        parameters:
+          env: 'uat'
+          ARTIFACT_NAME: '$(ARTIFACT_NAME_UAT)'

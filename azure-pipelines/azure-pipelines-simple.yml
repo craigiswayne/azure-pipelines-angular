@@ -1,5 +1,5 @@
 trigger:
-  - '*'
+  - none
 
 variables:
   # defined in the Pipeline Library variable group
@@ -19,7 +19,7 @@ steps:
     inputs:
       command: 'ci'
 
-  - script: npm run build
+  - script: npm run build:prod
 
   - task: AzureStaticWebApp@0
     inputs:

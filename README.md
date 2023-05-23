@@ -40,3 +40,7 @@ The following steps are performed in the pipeline
    8. `  condition: and(succeeded(), eq(variables.isMain, true))`
 9. clean up variables
 10. check for instances of `playground-angular`
+10. check for instances of `dist`
+11. ARTIFACT_NAME should be dynamic
+12. ARTIFACT_NAME to be based off build number
+13. DEPLOY STAGE INSTEAD OF JOB

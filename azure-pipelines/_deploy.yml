@@ -2,12 +2,6 @@ parameters:
   - name: isProd
     type: boolean
     default: false
-  - name: BUILD_OUTPUT_FOLDER
-    type: string
-    default: ''
-  - name: APP_NAME
-    type: string
-    default: ''
 
 steps:
   - download: none
@@ -17,14 +11,16 @@ steps:
     inputs:
       buildType: current
       downloadType: single
-      artifactName: '$(ARTIFACT_NAME)'
+      artifactName: '$(ARTIFACT_NAME_UAT)'
       downloadPath: $(System.ArtifactsDirectory)
 
   # see: https://learn.microsoft.com/en-us/azure/devops/pipelines/tasks/reference/azure-static-web-app-v0?view=azure-pipelines
   - task: AzureStaticWebApp@0
-    displayName: 'Deploy: PROD'
+    displayName: 'Deploy: UAT'
     inputs:
-      workingDirectory: '$(System.ArtifactsDirectory)/$(ARTIFACT_NAME)'
+      build_timeout_in_minutes: 5
+      workingDirectory: '$(System.ArtifactsDirectory)/$(ARTIFACT_NAME_UAT)'
+      deployment_environment: 'uat'
       app_location: '/'
       # Look inside this directory for the staticwebapp.config.json file
       # This file allows you to further configure your static web app

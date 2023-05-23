@@ -8,8 +8,10 @@ variables:
   - name: isProd
     # https://learn.microsoft.com/en-us/azure/devops/pipelines/process/expressions?view=azure-devops
     value: ${{ startsWith(variables['Build.SourceBranch'], 'refs/heads/release/') }}
-  - name: ARTIFACT_NAME
-    value: '$(Build.Repository.Name).$(Build.BuildNumber)'
+  - name: ARTIFACT_NAME_UAT
+    value: '$(Build.Repository.Name).$(Build.BuildNumber)_uat'
+  - name: ARTIFACT_NAME_PROD
+    value: '$(Build.Repository.Name).$(Build.BuildNumber)_prod'
   # defined in the Pipeline Library variable group
   # see: https://learn.microsoft.com/en-us/azure/devops/pipelines/library/variable-groups?view=azure-devops&tabs=yaml
   - group: DEFAULT_VARIABLE_GROUP

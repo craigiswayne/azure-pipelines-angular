@@ -28,10 +28,36 @@ steps:
   - script: npm run lint
     displayName: 'Lint: Typescript'
 
-  - script: npm run build
-    condition: ${{ and(succeeded(), eq(parameters.isProd, false)) }}
+  - script: npm run build:uat
     displayName: 'Angular Build: UAT'
 
-  - script: npm run build -- -c production
-    condition: ${{ and(succeeded(), eq(parameters.isProd, true)) }}
+  - task: CopyFiles@2
+    displayName: 'Copying files from $(BUILD_OUTPUT_FOLDER) folder'
+    inputs:
+      contents: |
+        azure-pipelines/staticwebapp.config.json
+      targetFolder: '$(BUILD_OUTPUT_FOLDER)/$(APP_NAME)'
+      flattenFolders: true
+
+  - task: PublishBuildArtifacts@1
+    displayName: 'Publish Artifact: UAT'
+    inputs:
+      pathToPublish: '$(BUILD_OUTPUT_FOLDER)/$(APP_NAME)'
+      artifactName: '$(ARTIFACT_NAME_UAT)'
+
+  - script: npm run build:prod
     displayName: 'Angular Build: PROD'
+
+  - task: CopyFiles@2
+    displayName: 'Copying files from $(BUILD_OUTPUT_FOLDER) folder'
+    inputs:
+      contents: |
+        azure-pipelines/staticwebapp.config.json
+      targetFolder: '$(BUILD_OUTPUT_FOLDER)/$(APP_NAME)'
+      flattenFolders: true
+
+  - task: PublishBuildArtifacts@1
+    displayName: 'Publish Artifact: PROD'
+    inputs:
+      pathToPublish: '$(BUILD_OUTPUT_FOLDER)/$(APP_NAME)'
+      artifactName: '$(ARTIFACT_NAME_PROD)'
